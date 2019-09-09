@@ -2,201 +2,317 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "Core/HW/DSPLLE/DSPDebugInterface.h"
+
+#include <array>
+#include <cstddef>
 #include <string>
+
+#include <fmt/format.h>
 
 #include "Common/MsgHandler.h"
 #include "Core/DSP/DSPCore.h"
 #include "Core/DSP/DSPMemoryMap.h"
-#include "Core/HW/DSPLLE/DSPDebugInterface.h"
 #include "Core/HW/DSPLLE/DSPSymbols.h"
 
-std::string DSPDebugInterface::Disassemble(unsigned int address)
+namespace DSP::LLE
 {
-	// we'll treat addresses as line numbers.
-	return DSPSymbols::GetLineText(address);
+void DSPPatches::Patch(std::size_t index)
+{
+  PanicAlert("Patch functionality not supported in DSP module.");
 }
 
-void DSPDebugInterface::GetRawMemoryString(int memory, unsigned int address, char *dest, int max_size)
-{
-	if (DSPCore_GetState() == DSPCORE_STOP)
-	{
-		dest[0] = 0;
-		return;
-	}
+DSPDebugInterface::DSPDebugInterface() = default;
+DSPDebugInterface::~DSPDebugInterface() = default;
 
-	switch (memory)
-	{
-	case 0:  // IMEM
-		switch (address >> 12)
-		{
-		case 0:
-		case 0x8:
-			sprintf(dest, "%04x", dsp_imem_read(address));
-			break;
-		default:
-			sprintf(dest, "--IMEM--");
-			break;
-		}
-		break;
-	case 1:  // DMEM
-		switch (address >> 12)
-		{
-		case 0:
-		case 1:
-			sprintf(dest, "%04x (DMEM)", dsp_dmem_read(address));
-			break;
-		case 0xf:
-			sprintf(dest, "%04x (MMIO)", g_dsp.ifx_regs[address & 0xFF]);
-			break;
-		default:
-			sprintf(dest, "--DMEM--");
-			break;
-		}
-		break;
-	}
+std::size_t DSPDebugInterface::SetWatch(u32 address, std::string name)
+{
+  return m_watches.SetWatch(address, std::move(name));
 }
 
-unsigned int DSPDebugInterface::ReadMemory(unsigned int address)
+const Common::Debug::Watch& DSPDebugInterface::GetWatch(std::size_t index) const
 {
-	return 0;
+  return m_watches.GetWatch(index);
 }
 
-unsigned int DSPDebugInterface::ReadInstruction(unsigned int address)
+const std::vector<Common::Debug::Watch>& DSPDebugInterface::GetWatches() const
 {
-	return 0;
+  return m_watches.GetWatches();
 }
 
-bool DSPDebugInterface::IsAlive()
+void DSPDebugInterface::UnsetWatch(u32 address)
 {
-	return true; //Core::GetState() != Core::CORE_UNINITIALIZED;
+  m_watches.UnsetWatch(address);
 }
 
-bool DSPDebugInterface::IsBreakpoint(unsigned int address)
+void DSPDebugInterface::UpdateWatch(std::size_t index, u32 address, std::string name)
 {
-	int real_addr = DSPSymbols::Line2Addr(address);
-	if (real_addr >= 0)
-		return g_dsp_breakpoints.IsAddressBreakPoint(real_addr);
-
-	return false;
+  return m_watches.UpdateWatch(index, address, std::move(name));
 }
 
-void DSPDebugInterface::SetBreakpoint(unsigned int address)
+void DSPDebugInterface::UpdateWatchAddress(std::size_t index, u32 address)
 {
-	int real_addr = DSPSymbols::Line2Addr(address);
-
-	if (real_addr >= 0)
-	{
-		if (g_dsp_breakpoints.Add(real_addr))
-		{
-
-		}
-	}
+  return m_watches.UpdateWatchAddress(index, address);
 }
 
-void DSPDebugInterface::ClearBreakpoint(unsigned int address)
+void DSPDebugInterface::UpdateWatchName(std::size_t index, std::string name)
 {
-	int real_addr = DSPSymbols::Line2Addr(address);
+  return m_watches.UpdateWatchName(index, std::move(name));
+}
 
-	if (real_addr >= 0)
-	{
-		if (g_dsp_breakpoints.Remove(real_addr))
-		{
+void DSPDebugInterface::EnableWatch(std::size_t index)
+{
+  m_watches.EnableWatch(index);
+}
 
-		}
-	}
+void DSPDebugInterface::DisableWatch(std::size_t index)
+{
+  m_watches.DisableWatch(index);
+}
+
+bool DSPDebugInterface::HasEnabledWatch(u32 address) const
+{
+  return m_watches.HasEnabledWatch(address);
+}
+
+void DSPDebugInterface::RemoveWatch(std::size_t index)
+{
+  return m_watches.RemoveWatch(index);
+}
+
+void DSPDebugInterface::LoadWatchesFromStrings(const std::vector<std::string>& watches)
+{
+  m_watches.LoadFromStrings(watches);
+}
+
+std::vector<std::string> DSPDebugInterface::SaveWatchesToStrings() const
+{
+  return m_watches.SaveToStrings();
+}
+
+void DSPDebugInterface::ClearWatches()
+{
+  m_watches.Clear();
+}
+
+void DSPDebugInterface::SetPatch(u32 address, u32 value)
+{
+  m_patches.SetPatch(address, value);
+}
+
+void DSPDebugInterface::SetPatch(u32 address, std::vector<u8> value)
+{
+  m_patches.SetPatch(address, std::move(value));
+}
+
+const std::vector<Common::Debug::MemoryPatch>& DSPDebugInterface::GetPatches() const
+{
+  return m_patches.GetPatches();
+}
+
+void DSPDebugInterface::UnsetPatch(u32 address)
+{
+  m_patches.UnsetPatch(address);
+}
+
+void DSPDebugInterface::EnablePatch(std::size_t index)
+{
+  m_patches.EnablePatch(index);
+}
+
+void DSPDebugInterface::DisablePatch(std::size_t index)
+{
+  m_patches.DisablePatch(index);
+}
+
+void DSPDebugInterface::RemovePatch(std::size_t index)
+{
+  m_patches.RemovePatch(index);
+}
+
+bool DSPDebugInterface::HasEnabledPatch(u32 address) const
+{
+  return m_patches.HasEnabledPatch(address);
+}
+
+void DSPDebugInterface::ClearPatches()
+{
+  m_patches.ClearPatches();
+}
+
+std::string DSPDebugInterface::Disassemble(u32 address) const
+{
+  // we'll treat addresses as line numbers.
+  return Symbols::GetLineText(address);
+}
+
+std::string DSPDebugInterface::GetRawMemoryString(int memory, u32 address) const
+{
+  if (DSPCore_GetState() == State::Stopped)
+    return "";
+
+  switch (memory)
+  {
+  case 0:  // IMEM
+    switch (address >> 12)
+    {
+    case 0:
+    case 0x8:
+      return fmt::format("{:04x}", dsp_imem_read(address));
+    default:
+      return "--IMEM--";
+    }
+
+  case 1:  // DMEM
+    switch (address >> 12)
+    {
+    case 0:
+    case 1:
+      return fmt::format("{:04x} (DMEM)", dsp_dmem_read(address));
+    case 0xf:
+      return fmt::format("{:04x} (MMIO)", g_dsp.ifx_regs[address & 0xFF]);
+    default:
+      return "--DMEM--";
+    }
+  }
+
+  return "";
+}
+
+u32 DSPDebugInterface::ReadMemory(u32 address) const
+{
+  return 0;
+}
+
+u32 DSPDebugInterface::ReadInstruction(u32 address) const
+{
+  return 0;
+}
+
+bool DSPDebugInterface::IsAlive() const
+{
+  return true;
+}
+
+bool DSPDebugInterface::IsBreakpoint(u32 address) const
+{
+  int real_addr = Symbols::Line2Addr(address);
+  if (real_addr >= 0)
+    return g_dsp_breakpoints.IsAddressBreakPoint(real_addr);
+
+  return false;
+}
+
+void DSPDebugInterface::SetBreakpoint(u32 address)
+{
+  int real_addr = Symbols::Line2Addr(address);
+
+  if (real_addr >= 0)
+  {
+    g_dsp_breakpoints.Add(real_addr);
+  }
+}
+
+void DSPDebugInterface::ClearBreakpoint(u32 address)
+{
+  int real_addr = Symbols::Line2Addr(address);
+
+  if (real_addr >= 0)
+  {
+    g_dsp_breakpoints.Remove(real_addr);
+  }
 }
 
 void DSPDebugInterface::ClearAllBreakpoints()
 {
-	g_dsp_breakpoints.Clear();
+  g_dsp_breakpoints.Clear();
 }
 
-void DSPDebugInterface::ToggleBreakpoint(unsigned int address)
+void DSPDebugInterface::ToggleBreakpoint(u32 address)
 {
-	int real_addr = DSPSymbols::Line2Addr(address);
-	if (real_addr >= 0)
-	{
-		if (g_dsp_breakpoints.IsAddressBreakPoint(real_addr))
-			g_dsp_breakpoints.Remove(real_addr);
-		else
-			g_dsp_breakpoints.Add(real_addr);
-	}
+  int real_addr = Symbols::Line2Addr(address);
+  if (real_addr >= 0)
+  {
+    if (g_dsp_breakpoints.IsAddressBreakPoint(real_addr))
+      g_dsp_breakpoints.Remove(real_addr);
+    else
+      g_dsp_breakpoints.Add(real_addr);
+  }
 }
 
-bool DSPDebugInterface::IsMemCheck(unsigned int address)
+bool DSPDebugInterface::IsMemCheck(u32 address, size_t size) const
 {
-	return false;
+  return false;
 }
 
 void DSPDebugInterface::ClearAllMemChecks()
 {
-	PanicAlert("MemCheck functionality not supported in DSP module.");
+  PanicAlert("MemCheck functionality not supported in DSP module.");
 }
 
-void DSPDebugInterface::ToggleMemCheck(unsigned int address)
+void DSPDebugInterface::ToggleMemCheck(u32 address, bool read, bool write, bool log)
 {
-	PanicAlert("MemCheck functionality not supported in DSP module.");
-}
-
-void DSPDebugInterface::InsertBLR(unsigned int address, unsigned int value)
-{
-	PanicAlert("insertBLR functionality not supported in DSP module.");
+  PanicAlert("MemCheck functionality not supported in DSP module.");
 }
 
 // =======================================================
 // Separate the blocks with colors.
 // -------------
-int DSPDebugInterface::GetColor(unsigned int address)
+u32 DSPDebugInterface::GetColor(u32 address) const
 {
-	static const int colors[6] =
-	{
-		0xd0FFFF,  // light cyan
-		0xFFd0d0,  // light red
-		0xd8d8FF,  // light blue
-		0xFFd0FF,  // light purple
-		0xd0FFd0,  // light green
-		0xFFFFd0,  // light yellow
-	};
+  // Scan backwards so we don't miss it. Hm, actually, let's not - it looks pretty good.
+  int addr = -1;
+  for (int i = 0; i < 1; i++)
+  {
+    addr = Symbols::Line2Addr(address - i);
+    if (addr >= 0)
+      break;
+  }
+  if (addr == -1)
+    return 0xFFFFFF;
 
-	// Scan backwards so we don't miss it. Hm, actually, let's not - it looks pretty good.
-	int addr = -1;
-	for (int i = 0; i < 1; i++)
-	{
-		addr = DSPSymbols::Line2Addr(address - i);
-		if (addr >= 0)
-			break;
-	}
-	if (addr == -1)
-		return 0xFFFFFF;
+  Common::Symbol* symbol = Symbols::g_dsp_symbol_db.GetSymbolFromAddr(addr);
+  if (!symbol)
+    return 0xFFFFFF;
+  if (symbol->type != Common::Symbol::Type::Function)
+    return 0xEEEEFF;
 
-	Symbol *symbol = DSPSymbols::g_dsp_symbol_db.GetSymbolFromAddr(addr);
-	if (!symbol)
-		return 0xFFFFFF;
-	if (symbol->type != Symbol::SYMBOL_FUNCTION)
-		return 0xEEEEFF;
-	return colors[symbol->index % 6];
+  static constexpr std::array<u32, 6> colors{
+      0xd0FFFF,  // light cyan
+      0xFFd0d0,  // light red
+      0xd8d8FF,  // light blue
+      0xFFd0FF,  // light purple
+      0xd0FFd0,  // light green
+      0xFFFFd0,  // light yellow
+  };
+  return colors[symbol->index % colors.size()];
 }
 // =============
 
-
-std::string DSPDebugInterface::GetDescription(unsigned int address)
+std::string DSPDebugInterface::GetDescription(u32 address) const
 {
-	return "";  // g_symbolDB.GetDescription(address);
+  return "";  // g_symbolDB.GetDescription(address);
 }
 
-unsigned int DSPDebugInterface::GetPC()
+u32 DSPDebugInterface::GetPC() const
 {
-	return DSPSymbols::Addr2Line(g_dsp.pc);
+  return Symbols::Addr2Line(DSP::g_dsp.pc);
 }
 
-void DSPDebugInterface::SetPC(unsigned int address)
+void DSPDebugInterface::SetPC(u32 address)
 {
-	int new_pc = DSPSymbols::Line2Addr(address);
-	if (new_pc > 0)
-		g_dsp.pc = new_pc;
+  int new_pc = Symbols::Line2Addr(address);
+  if (new_pc > 0)
+    g_dsp.pc = new_pc;
 }
 
 void DSPDebugInterface::RunToBreakpoint()
 {
-
 }
+
+void DSPDebugInterface::Clear()
+{
+  ClearPatches();
+  ClearWatches();
+}
+}  // namespace DSP::LLE

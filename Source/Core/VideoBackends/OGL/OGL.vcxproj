@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -12,11 +12,12 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{EC1A314C-5588-4506-9C1E-2E58E5817F75}</ProjectGuid>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
@@ -35,33 +36,30 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
+    <ClCompile Include="OGLPipeline.cpp" />
+    <ClCompile Include="OGLShader.cpp" />
+    <ClCompile Include="OGLTexture.cpp" />
     <ClCompile Include="BoundingBox.cpp" />
-    <ClCompile Include="FramebufferManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="NativeVertexFormat.cpp" />
     <ClCompile Include="PerfQuery.cpp" />
-    <ClCompile Include="PostProcessing.cpp" />
     <ClCompile Include="ProgramShaderCache.cpp" />
-    <ClCompile Include="RasterFont.cpp" />
     <ClCompile Include="Render.cpp" />
     <ClCompile Include="SamplerCache.cpp" />
     <ClCompile Include="StreamBuffer.cpp" />
-    <ClCompile Include="TextureCache.cpp" />
-    <ClCompile Include="TextureConverter.cpp" />
     <ClCompile Include="VertexManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="OGLPipeline.h" />
+    <ClInclude Include="OGLShader.h" />
+    <ClInclude Include="OGLTexture.h" />
     <ClInclude Include="BoundingBox.h" />
-    <ClInclude Include="FramebufferManager.h" />
+    <ClInclude Include="GPUTimer.h" />
     <ClInclude Include="PerfQuery.h" />
-    <ClInclude Include="PostProcessing.h" />
     <ClInclude Include="ProgramShaderCache.h" />
-    <ClInclude Include="RasterFont.h" />
     <ClInclude Include="Render.h" />
     <ClInclude Include="SamplerCache.h" />
     <ClInclude Include="StreamBuffer.h" />
-    <ClInclude Include="TextureCache.h" />
-    <ClInclude Include="TextureConverter.h" />
     <ClInclude Include="VertexManager.h" />
     <ClInclude Include="VideoBackend.h" />
   </ItemGroup>

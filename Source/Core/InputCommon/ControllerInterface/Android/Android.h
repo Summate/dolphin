@@ -4,50 +4,64 @@
 
 #pragma once
 
-#include "InputCommon/ControllerInterface/Device.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "jni/ButtonManager.h"
 
-namespace ciface
+namespace ciface::Android
 {
-namespace Android
-{
+void PopulateDevices();
 
-void Init( std::vector<Core::Device*>& devices );
 class Touchscreen : public Core::Device
 {
 private:
-	class Button : public Input
-	{
-	public:
-		std::string GetName() const;
-		Button(int padID, ButtonManager::ButtonType index) :  _padID(padID), _index(index) {}
-		ControlState GetState() const;
-	private:
-		const int _padID;
-		const ButtonManager::ButtonType _index;
-	};
-	class Axis : public Input
-	{
-	public:
-		std::string GetName() const;
-		Axis(int padID, ButtonManager::ButtonType index, float neg = 1.0f) : _padID(padID), _index(index), _neg(neg) {}
-		ControlState GetState() const;
-	private:
-		const int _padID;
-		const ButtonManager::ButtonType _index;
-		const float _neg;
-	};
+  class Button : public Input
+  {
+  public:
+    std::string GetName() const;
+    Button(int padID, ButtonManager::ButtonType index) : _padID(padID), _index(index) {}
+    ControlState GetState() const;
+
+  private:
+    const int _padID;
+    const ButtonManager::ButtonType _index;
+  };
+  class Axis : public Input
+  {
+  public:
+    std::string GetName() const;
+    bool IsDetectable() override { return false; }
+    Axis(int padID, ButtonManager::ButtonType index, float neg = 1.0f)
+        : _padID(padID), _index(index), _neg(neg)
+    {
+    }
+    ControlState GetState() const;
+
+  private:
+    const int _padID;
+    const ButtonManager::ButtonType _index;
+    const float _neg;
+  };
+  class Motor : public Core::Device::Output
+  {
+  public:
+    Motor(int padID, ButtonManager::ButtonType index) : _padID(padID), _index(index) {}
+    ~Motor();
+    std::string GetName() const override;
+    void SetState(ControlState state) override;
+
+  private:
+    const int _padID;
+    const ButtonManager::ButtonType _index;
+    static void Rumble(int padID, double state);
+  };
 
 public:
-	Touchscreen(int padID);
-	~Touchscreen() {}
+  Touchscreen(int padID);
+  ~Touchscreen() {}
+  std::string GetName() const;
+  std::string GetSource() const;
 
-	std::string GetName() const;
-	int GetId() const;
-	std::string GetSource() const;
 private:
-	const int _padID;
+  const int _padID;
 };
-
-}
-}
+}  // namespace ciface::Android

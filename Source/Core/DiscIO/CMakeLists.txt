@@ -1,20 +1,49 @@
-set(SRCS	Blob.cpp
-			CISOBlob.cpp
-			WbfsBlob.cpp
-			CompressedBlob.cpp
-			DiscScrubber.cpp
-			DriveBlob.cpp
-			FileBlob.cpp
-			FileMonitor.cpp
-			FileSystemGCWii.cpp
-			Filesystem.cpp
-			NANDContentLoader.cpp
-			VolumeCommon.cpp
-			VolumeCreator.cpp
-			VolumeDirectory.cpp
-			VolumeGC.cpp
-			VolumeWad.cpp
-			VolumeWiiCrypted.cpp
-			WiiWad.cpp)
+add_library(discio
+  Blob.cpp
+  Blob.h
+  CISOBlob.cpp
+  CISOBlob.h
+  CompressedBlob.cpp
+  CompressedBlob.h
+  DirectoryBlob.cpp
+  DirectoryBlob.h
+  DiscExtractor.cpp
+  DiscExtractor.h
+  DiscScrubber.cpp
+  DiscScrubber.h
+  DriveBlob.cpp
+  DriveBlob.h
+  Enums.cpp
+  Enums.h
+  FileBlob.cpp
+  FileBlob.h
+  FileSystemGCWii.cpp
+  FileSystemGCWii.h
+  Filesystem.cpp
+  Filesystem.h
+  NANDImporter.cpp
+  NANDImporter.h
+  TGCBlob.cpp
+  TGCBlob.h
+  Volume.cpp
+  Volume.h
+  VolumeFileBlobReader.cpp
+  VolumeFileBlobReader.h
+  VolumeGC.cpp
+  VolumeGC.h
+  VolumeVerifier.cpp
+  VolumeVerifier.h
+  VolumeWad.cpp
+  VolumeWad.h
+  VolumeWii.cpp
+  VolumeWii.h
+  WbfsBlob.cpp
+  WbfsBlob.h
+  WiiSaveBanner.cpp
+  WiiSaveBanner.h
+)
 
-add_dolphin_library(discio "${SRCS}" "")
+target_link_libraries(discio
+PRIVATE
+  ZLIB::ZLIB
+)

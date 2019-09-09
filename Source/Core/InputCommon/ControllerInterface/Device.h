@@ -4,7 +4,11 @@
 
 #pragma once
 
+#include <memory>
+#include <mutex>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "Common/CommonTypes.h"
@@ -14,135 +18,132 @@ typedef double ControlState;
 
 namespace ciface
 {
+// 100Hz which homebrew docs very roughly imply is within WiiMote normal
+// range, used for periodic haptic effects though often ignored by devices
+// TODO: Make this configurable.
+constexpr int RUMBLE_PERIOD_MS = 10;
+// This needs to be at least as long as the longest rumble that might ever be played.
+// Too short and it's going to stop in the middle of a long effect.
+// Infinite values are invalid for ramp effects and probably not sensible.
+constexpr int RUMBLE_LENGTH_MS = 1000 * 10;
+
 namespace Core
 {
-
-// Forward declarations
-class DeviceQualifier;
-
-//
-// Device
-//
-// A device class
-//
 class Device
 {
 public:
-	class Input;
-	class Output;
+  class Input;
+  class Output;
 
-	//
-	// Control
-	//
-	// Control includes inputs and outputs
-	//
-	class Control // input or output
-	{
-	public:
-		virtual std::string GetName() const = 0;
-		virtual ~Control() {}
+  //
+  // Control
+  //
+  // Control includes inputs and outputs
+  //
+  class Control  // input or output
+  {
+  public:
+    virtual ~Control() = default;
+    virtual std::string GetName() const = 0;
+    virtual Input* ToInput() { return nullptr; }
+    virtual Output* ToOutput() { return nullptr; }
 
-		bool InputGateOn();
+    // May be overridden to allow multiple valid names.
+    // Useful for backwards-compatible configurations when names change.
+    virtual bool IsMatchingName(std::string_view name) const;
+  };
 
-		virtual Input* ToInput() { return nullptr; }
-		virtual Output* ToOutput() { return nullptr; }
-	};
+  //
+  // Input
+  //
+  // An input on a device
+  //
+  class Input : public Control
+  {
+  public:
+    // Things like absolute axes/ absolute mouse position should override this to prevent
+    // undesirable behavior in our mapping logic.
+    virtual bool IsDetectable() { return true; }
 
-	//
-	// Input
-	//
-	// An input on a device
-	//
-	class Input : public Control
-	{
-	public:
-		// things like absolute axes/ absolute mouse position will override this
-		virtual bool IsDetectable() { return true; }
+    // Implementations should return a value from 0.0 to 1.0 across their normal range.
+    // One input should be provided for each "direction". (e.g. 2 for each axis)
+    // If possible, negative values may be returned in situations where an opposing input is
+    // activated. (e.g. When an underlying axis, X, is currently negative, "Axis X-", will return a
+    // positive value and "Axis X+" may return a negative value.)
+    // Doing so is solely to allow our input detection logic to better detect false positives.
+    // This is necessary when making use of "FullAnalogSurface" as multiple inputs will be seen
+    // increasing from 0.0 to 1.0 as a user tries to map just one. The negative values provide a
+    // view of the underlying axis. (Negative values are clamped off before they reach
+    // expression-parser or controller-emu)
+    virtual ControlState GetState() const = 0;
 
-		virtual ControlState GetState() const = 0;
+    Input* ToInput() override { return this; }
+  };
 
-		ControlState GetGatedState()
-		{
-			if (InputGateOn())
-				return GetState();
-			else
-				return 0.0;
-		}
+  //
+  // Output
+  //
+  // An output on a device
+  //
+  class Output : public Control
+  {
+  public:
+    virtual ~Output() = default;
+    virtual void SetState(ControlState state) = 0;
+    Output* ToOutput() override { return this; }
+  };
 
-		Input* ToInput() override { return this; }
-	};
+  virtual ~Device();
 
-	//
-	// Output
-	//
-	// An output on a device
-	//
-	class Output : public Control
-	{
-	public:
-		virtual ~Output() {}
+  int GetId() const { return m_id; }
+  void SetId(int id) { m_id = id; }
+  virtual std::string GetName() const = 0;
+  virtual std::string GetSource() const = 0;
+  std::string GetQualifiedName() const;
+  virtual void UpdateInput() {}
 
-		virtual void SetState(ControlState state) = 0;
+  // May be overridden to implement hotplug removal.
+  // Currently handled on a per-backend basis but this could change.
+  virtual bool IsValid() const { return true; }
 
-		void SetGatedState(ControlState state)
-		{
-			if (InputGateOn())
-				SetState(state);
-		}
+  // (e.g. Xbox 360 controllers have controller number LEDs which should match the ID we use.)
+  virtual std::optional<int> GetPreferredId() const;
 
-		Output* ToOutput() override { return this; }
-	};
+  const std::vector<Input*>& Inputs() const { return m_inputs; }
+  const std::vector<Output*>& Outputs() const { return m_outputs; }
 
-	virtual ~Device();
-
-	virtual std::string GetName() const = 0;
-	virtual int GetId() const = 0;
-	virtual std::string GetSource() const = 0;
-	virtual void UpdateInput() {}
-
-	const std::vector<Input*>& Inputs() const { return m_inputs; }
-	const std::vector<Output*>& Outputs() const { return m_outputs; }
-
-	Input* FindInput(const std::string& name) const;
-	Output* FindOutput(const std::string& name) const;
+  Input* FindInput(std::string_view name) const;
+  Output* FindOutput(std::string_view name) const;
 
 protected:
-	void AddInput(Input* const i);
-	void AddOutput(Output* const o);
+  void AddInput(Input* const i);
+  void AddOutput(Output* const o);
 
-	class FullAnalogSurface : public Input
-	{
-	public:
-		FullAnalogSurface(Input* low, Input* high)
-			: m_low(*low), m_high(*high)
-		{}
+  class FullAnalogSurface final : public Input
+  {
+  public:
+    FullAnalogSurface(Input* low, Input* high) : m_low(*low), m_high(*high) {}
+    ControlState GetState() const override;
+    std::string GetName() const override;
+    bool IsMatchingName(std::string_view name) const override;
 
-		ControlState GetState() const override
-		{
-			return (1 + m_high.GetState() - m_low.GetState()) / 2;
-		}
+  private:
+    Input& m_low;
+    Input& m_high;
+  };
 
-		std::string GetName() const override
-		{
-			return m_low.GetName() + *m_high.GetName().rbegin();
-		}
-
-	private:
-		Input& m_low;
-		Input& m_high;
-	};
-
-	void AddAnalogInputs(Input* low, Input* high)
-	{
-		AddInput(low);
-		AddInput(high);
-		AddInput(new FullAnalogSurface(low, high));
-		AddInput(new FullAnalogSurface(high, low));
-	}
+  void AddAnalogInputs(Input* low, Input* high)
+  {
+    AddInput(low);
+    AddInput(high);
+    AddInput(new FullAnalogSurface(low, high));
+    AddInput(new FullAnalogSurface(high, low));
+  }
 
 private:
-	std::vector<Input*>  m_inputs;
-	std::vector<Output*> m_outputs;
+  int m_id;
+  std::vector<Input*> m_inputs;
+  std::vector<Output*> m_outputs;
 };
 
 //
@@ -154,31 +155,44 @@ private:
 class DeviceQualifier
 {
 public:
-	DeviceQualifier() : cid(-1) {}
-	DeviceQualifier(const std::string& _source, const int _id, const std::string& _name)
-		: source(_source), cid(_id), name(_name) {}
-	void FromDevice(const Device* const dev);
-	void FromString(const std::string& str);
-	std::string ToString() const;
-	bool operator==(const DeviceQualifier& devq) const;
-	bool operator==(const Device* const dev) const;
+  DeviceQualifier() : cid(-1) {}
+  DeviceQualifier(std::string source_, const int id_, std::string name_)
+      : source(std::move(source_)), cid(id_), name(std::move(name_))
+  {
+  }
+  void FromDevice(const Device* const dev);
+  void FromString(const std::string& str);
+  std::string ToString() const;
 
-	std::string  source;
-	int          cid;
-	std::string  name;
+  bool operator==(const DeviceQualifier& devq) const;
+  bool operator!=(const DeviceQualifier& devq) const;
+
+  bool operator==(const Device* dev) const;
+  bool operator!=(const Device* dev) const;
+
+  std::string source;
+  int cid;
+  std::string name;
 };
 
 class DeviceContainer
 {
 public:
-	Device::Input* FindInput(const std::string& name, const Device* def_dev) const;
-	Device::Output* FindOutput(const std::string& name, const Device* def_dev) const;
+  Device::Input* FindInput(std::string_view name, const Device* def_dev) const;
+  Device::Output* FindOutput(std::string_view name, const Device* def_dev) const;
 
-	const std::vector<Device*>& Devices() const { return m_devices; }
-	Device* FindDevice(const DeviceQualifier& devq) const;
+  std::vector<std::string> GetAllDeviceStrings() const;
+  std::string GetDefaultDeviceString() const;
+  std::shared_ptr<Device> FindDevice(const DeviceQualifier& devq) const;
+
+  bool HasConnectedDevice(const DeviceQualifier& qualifier) const;
+
+  std::pair<std::shared_ptr<Device>, Device::Input*>
+  DetectInput(u32 wait_ms, const std::vector<std::string>& device_strings) const;
+
 protected:
-	std::vector<Device*> m_devices;
+  mutable std::mutex m_devices_mutex;
+  std::vector<std::shared_ptr<Device>> m_devices;
 };
-
-}
-}
+}  // namespace Core
+}  // namespace ciface
